@@ -1,0 +1,31 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# Data files (contain personal health data - never commit)
+data/*.duckdb
+data/*.duckdb.wal
+data/*.json
+data/*.parquet
+data/*.csv
+
+# dbt build artifacts
+dbt_project/target/
+dbt_project/logs/
+
+# Python build artifacts
+*.egg-info/
+*.egg-link
+dist/
+build/
+
+# Jupyter
+test-env.ipynb
+.ipynb_checkpoints/
+
+# Streamlit
+.streamlit/
+
+# macOS
+.DS_Store

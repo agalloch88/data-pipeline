@@ -1,0 +1,7 @@
+data_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "../data/pipeline.duckdb"
+      threads: 4

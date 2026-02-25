@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: mart_daily_wellness
+    description: "Daily wellness mart combining sleep, weather, and commit activity."
+    columns:
+      - name: day
+        description: "Calendar day."
+        tests:
+          - not_null
+          - unique
+      - name: commit_count
+        description: "Number of commits on the day."
+
+  - name: mart_weekly_summary
+    description: "Weekly aggregation of daily wellness metrics by ISO week start."
+    columns:
+      - name: week_start
+        description: "Week start date (ISO week)."
+        tests:
+          - not_null
+          - unique
+      - name: days_tracked
+        description: "Number of days included in the weekly rollup."

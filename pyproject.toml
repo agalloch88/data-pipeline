@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "data-pipeline"
+version = "0.1.0"
+description = "Multi-source health & activity analytics pipeline — Oura + Weather + GitHub → DuckDB → dbt → Evidence.dev"
+requires-python = ">=3.10"
+dependencies = [
+    "dagster>=1.6.0",
+    "dagster-webserver>=1.6.0",
+    "dagster-duckdb>=0.22.0",
+    "dbt-duckdb>=1.7.0",
+    "dbt-core>=1.7.0",
+    "duckdb>=0.10.0",
+    "requests>=2.31.0",
+    "pydantic>=2.5.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "ruff",
+    "pytest",
+    "pre-commit",
+]
+
+[tool.setuptools.packages.find]
+include = ["pipeline_assets*"]
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I"]
+
+[tool.dagster]
+module_name = "pipeline_assets"

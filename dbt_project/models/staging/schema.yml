@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: stg_oura_sleep
+    description: "Staged Oura sleep records with core sleep metrics."
+    columns:
+      - name: id
+        description: "Oura sleep record identifier."
+        tests:
+          - not_null
+          - unique
+      - name: day
+        description: "Sleep day (date)."
+        tests:
+          - not_null
+
+  - name: stg_oura_activity
+    description: "Staged activity-related fields derived from Oura sleep records."
+    columns:
+      - name: id
+        description: "Oura sleep record identifier."
+        tests:
+          - not_null
+          - unique
+      - name: day
+        description: "Activity day (date)."
+        tests:
+          - not_null
+
+  - name: stg_weather_daily
+    description: "Staged daily weather observations with temperature conversions."
+    columns:
+      - name: dt
+        description: "Weather observation timestamp."
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_github_commits
+    description: "Staged GitHub commits with de-duplication by SHA."
+    columns:
+      - name: sha
+        description: "Commit SHA."
+        tests:
+          - not_null
+          - unique
+      - name: committed_at
+        description: "Commit timestamp."
+        tests:
+          - not_null

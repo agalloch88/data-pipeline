@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: int_daily_health_weather
+    description: "Daily join of Oura sleep and weather observations."
+    columns:
+      - name: day
+        description: "Calendar day."
+        tests:
+          - not_null
+          - unique
+      - name: sleep_score
+        description: "Oura sleep score for the day."
+      - name: sleep_hours
+        description: "Total sleep duration in hours."
