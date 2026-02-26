@@ -106,8 +106,8 @@ mart_weekly_summary     -- Aggregated weekly trends and correlations
 
 1. **Clone and setup environment:**
    ```bash
-   git clone <repository-url>
-   cd health-analytics-pipeline
+   git clone https://github.com/youvereachedhenryjones/data-pipeline.git
+   cd data-pipeline
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
@@ -174,6 +174,6 @@ All transformations include comprehensive testing:
 
 ---
 
-**Built by Ryan Kirsch** | [Portfolio](link-to-portfolio) | [LinkedIn](link-to-linkedin)
+**Built by Ryan Kirsch** | [Portfolio](https://ryankirsch.dev) | [LinkedIn](https://linkedin.com/in/ryankirsch) | [GitHub](https://github.com/agalloch88)
 
 *This pipeline processes real personal data to demonstrate production-ready data engineering capabilities for analytical workloads.*
