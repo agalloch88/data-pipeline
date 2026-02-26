@@ -174,6 +174,6 @@ All transformations include comprehensive testing:
 
 ---
 
-**Built by Ryan Kirsch** | [Portfolio](https://ryankirsch.dev) | [LinkedIn](https://linkedin.com/in/ryankirsch) | [GitHub](https://github.com/agalloch88/data-pipeline)
+**Built by Ryan Kirsch** | [Portfolio](https://ryankirsch.dev) | [LinkedIn](https://linkedin.com/in/ryan-s-kirsch) | [GitHub](https://github.com/agalloch88/data-pipeline)
 
 *This pipeline processes real personal data to demonstrate production-ready data engineering capabilities for analytical workloads.*
