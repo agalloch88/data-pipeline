@@ -106,7 +106,7 @@ mart_weekly_summary     -- Aggregated weekly trends and correlations
 
 1. **Clone and setup environment:**
    ```bash
-   git clone https://github.com/youvereachedhenryjones/data-pipeline.git
+   git clone https://github.com/agalloch88/data-pipeline.git
    cd data-pipeline
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -174,6 +174,6 @@ All transformations include comprehensive testing:
 
 ---
 
-**Built by Ryan Kirsch** | [Portfolio](https://ryankirsch.dev) | [LinkedIn](https://linkedin.com/in/ryankirsch) | [GitHub](https://github.com/agalloch88)
+**Built by Ryan Kirsch** | [Portfolio](https://ryankirsch.dev) | [LinkedIn](https://linkedin.com/in/ryankirsch) | [GitHub](https://github.com/agalloch88/data-pipeline)
 
 *This pipeline processes real personal data to demonstrate production-ready data engineering capabilities for analytical workloads.*
