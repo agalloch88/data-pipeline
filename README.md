@@ -158,12 +158,57 @@ The pipeline runs on a configurable schedule with the following stages:
 
 ## Data Quality and Testing
 
-All transformations include comprehensive testing:
-- **Completeness tests**: Ensure required fields are populated
-- **Uniqueness tests**: Prevent duplicate records in dimension tables  
-- **Referential integrity**: Validate foreign key relationships
-- **Business logic**: Custom tests for domain-specific rules (e.g., sleep duration bounds)
-- **Freshness checks**: Alert on stale data beyond acceptable thresholds
+All transformations include a 17-test suite that validates data integrity across the full medallion stack.
+
+### Test Coverage by Layer
+
+| Layer | Models | Tests | Coverage |
+|-------|--------|-------|----------|
+| Staging | 4 models | 8 tests | Completeness + type validation |
+| Intermediate | 1 model | 3 tests | Join integrity + date spine |
+| Marts | 2 models | 6 tests | Uniqueness + business rules |
+| **Total** | **7 models** | **17 tests** | |
+
+### Test Types Used
+
+**Schema Tests (12 tests)** — Declarative YAML, run automatically on `dbt test`:
+- `not_null` — applied to all primary keys and critical metric fields (sleep score, readiness score, step count)
+- `unique` — applied to grain-level keys in staging and mart tables to prevent duplicate records
+- `relationships` — validates that mart foreign keys reference valid staging records
+
+**Custom Data Tests (5 tests)** — SQL assertions for business logic:
+- Sleep duration bounds: raw sleep minutes must be between 60 and 1,440 (1 hour to 24 hours)
+- Activity score range: Oura activity scores are 0-100; any value outside this range flags an API schema change
+- Readiness score range: same 0-100 validation on readiness metrics
+- Daily date spine continuity: no gaps in the daily mart (detects API outages or extraction failures)
+- GitHub commit timestamp: commit dates cannot be in the future (guards against timezone misconfigurations)
+
+### What the Tests Catch in Practice
+
+This test suite was designed to detect three failure categories:
+
+1. **API schema changes** — Oura and GitHub APIs occasionally rename or restructure fields. Type and range tests catch these before bad data reaches the mart layer.
+2. **Extraction failures** — The date spine continuity test surfaces missing days that indicate API rate-limiting, credential expiry, or network failures.
+3. **Transformation logic drift** — Custom SQL tests on business rules serve as regression guards: if a dbt model refactor accidentally changes aggregation logic, the bounds tests fail before the dashboard shows corrupt data.
+
+### Running the Tests
+
+```bash
+# Run all tests
+dbt test
+
+# Run tests for a specific model
+dbt test --select mart_daily_wellness
+
+# Run only schema tests
+dbt test --select test_type:generic
+
+# Run only custom SQL tests
+dbt test --select test_type:singular
+
+# Store failures in warehouse for inspection
+dbt test --store-failures
+```
 
 ## Performance Considerations
 
