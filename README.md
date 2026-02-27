@@ -210,6 +210,33 @@ dbt test --select test_type:singular
 dbt test --store-failures
 ```
 
+## Data Observability
+
+Great Expectations provides data validation plus data docs for observability, making it easy to detect broken inputs and track quality checks over time.
+
+### Validation Suites
+
+- **orders_suite**: required columns present, `order_id` and `customer_id` are non-null, `amount` > 0
+- **customers_suite**: required columns present, `customer_id` is non-null and unique, `email` matches expected format
+- **products_suite**: required columns present, `product_name` is non-null, `price` > 0, `category` is in the allowed set
+
+### Running Great Expectations
+
+```bash
+# Activate environment
+source ~/python-env/bin/activate
+
+# Run validations from repo root
+python scripts/validate_data.py
+```
+
+Expected input CSV files under `data/`:
+- `data/orders.csv`
+- `data/customers.csv`
+- `data/products.csv`
+
+**Environment caveat**: Great Expectations `0.18.8` on Python `3.14` may fail to import. If you hit import errors, use Python `<=3.13` or upgrade Great Expectations to a compatible version.
+
 ## Performance Considerations
 
 - **Incremental processing**: Only new/changed records processed in daily runs
