@@ -63,6 +63,10 @@ The consumer group design uses a single consumer group named `health-analytics` 
 
 Event generation uses a normal distribution (mean 72 bpm, std 6, clipped 55 to 120) to simulate realistic resting heart rate variation. This is not real Oura data but demonstrates the streaming pattern with realistic-looking data.
 
+## Security Note
+
+This is a development/portfolio configuration. Kafka and Zookeeper run without TLS or authentication. Do not deploy to production without adding SASL authentication and TLS encryption.
+
 ## Stopping
 
 ```bash

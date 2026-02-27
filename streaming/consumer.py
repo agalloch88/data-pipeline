@@ -5,7 +5,7 @@ import os
 import signal
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import duckdb
@@ -73,14 +73,27 @@ def main() -> int:
 
     signal.signal(signal.SIGINT, handle_sigint)
 
-    consumer = KafkaConsumer(
-        args.topic,
-        bootstrap_servers=[args.broker],
-        group_id="health-analytics",
-        enable_auto_commit=False,
-        auto_offset_reset="earliest",
-        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-    )
+    def safe_deserializer(value: Optional[bytes]) -> Optional[dict]:
+        if value is None:
+            return None
+        try:
+            return json.loads(value.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            print(f"Skipping malformed message: {exc}", file=sys.stderr)
+            return None
+
+    try:
+        consumer = KafkaConsumer(
+            args.topic,
+            bootstrap_servers=[args.broker],
+            group_id="health-analytics",
+            enable_auto_commit=False,
+            auto_offset_reset="earliest",
+            value_deserializer=safe_deserializer,
+        )
+    except Exception as exc:
+        print(f"Failed to initialize Kafka consumer: {exc}", file=sys.stderr)
+        return 1
 
     conn = duckdb.connect(db_path)
     ensure_table(conn)
@@ -97,18 +110,24 @@ def main() -> int:
             for _tp, messages in records.items():
                 for message in messages:
                     event = message.value
-                    conn.execute(
-                        """
-                        INSERT INTO streaming_events (timestamp, event_type, bpm, device_id)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (
-                            event.get("timestamp"),
-                            event.get("event_type"),
-                            event.get("bpm"),
-                            event.get("device_id"),
-                        ),
-                    )
+                    if event is None:
+                        continue
+                    try:
+                        conn.execute(
+                            """
+                            INSERT INTO streaming_events (timestamp, event_type, bpm, device_id)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (
+                                event.get("timestamp"),
+                                event.get("event_type"),
+                                event.get("bpm"),
+                                event.get("device_id"),
+                            ),
+                        )
+                    except Exception as exc:
+                        print(f"DuckDB insert failed: {exc}", file=sys.stderr)
+                        continue
                     consumed_total += 1
                     since_commit += 1
                     if event.get("bpm") is not None:
@@ -128,7 +147,7 @@ def main() -> int:
 
             if (now - last_stats_time) >= 30:
                 lag = get_lag(consumer)
-                stamp = datetime.now().strftime("%H:%M:%S")
+                stamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
                 print(
                     f"[{stamp}] Consumed: {consumed_total} events | Lag: {lag} | Last BPM: {last_bpm}"
                 )

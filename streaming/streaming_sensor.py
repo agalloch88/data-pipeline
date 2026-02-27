@@ -7,7 +7,8 @@ When new events are detected, it emits a RunRequest to trigger the streaming_sum
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+from time import sleep
 
 import duckdb
 from dagster import (
@@ -37,31 +38,58 @@ DB_PATH = resolve_db_path()
 
 def _get_latest_event_id(db_path: str) -> int:
     """Return the maximum event ID in the streaming_events table, or 0 if empty."""
-    try:
-        con = duckdb.connect(db_path, read_only=True)
-        result = con.execute("SELECT COALESCE(MAX(id), 0) FROM streaming_events").fetchone()
-        con.close()
-        return int(result[0]) if result else 0
-    except Exception:
-        return 0
+    for attempt in range(3):
+        con = None
+        try:
+            con = duckdb.connect(db_path, read_only=True)
+            result = con.execute("SELECT COALESCE(MAX(id), 0) FROM streaming_events").fetchone()
+            return int(result[0]) if result else 0
+        except Exception as exc:
+            if not _is_duckdb_lock_error(exc):
+                raise
+            if attempt == 2:
+                raise
+            sleep(0.5)
+        finally:
+            if con is not None:
+                try:
+                    con.close()
+                except Exception:
+                    pass
 
 
 def _table_exists(db_path: str, table_name: str) -> bool:
-    try:
-        con = duckdb.connect(db_path, read_only=True)
-        result = con.execute(
-            """
-            SELECT 1
-            FROM information_schema.tables
-            WHERE table_name = ?
-            LIMIT 1
-            """,
-            [table_name],
-        ).fetchone()
-        con.close()
-        return bool(result)
-    except Exception:
-        return False
+    for attempt in range(3):
+        con = None
+        try:
+            con = duckdb.connect(db_path, read_only=True)
+            result = con.execute(
+                """
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_name = ?
+                LIMIT 1
+                """,
+                [table_name],
+            ).fetchone()
+            return bool(result)
+        except Exception as exc:
+            if not _is_duckdb_lock_error(exc):
+                raise
+            if attempt == 2:
+                raise
+            sleep(0.5)
+        finally:
+            if con is not None:
+                try:
+                    con.close()
+                except Exception:
+                    pass
+
+
+def _is_duckdb_lock_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "lock" in message or "busy" in message
 
 
 @sensor(
@@ -95,6 +123,7 @@ def streaming_events_sensor(context: SensorEvaluationContext):
         context.update_cursor(str(current_id))
         yield RunRequest(
             run_key=f"streaming-{current_id}",
+            # Intentionally kept for future incremental processing.
             run_config={
                 "ops": {
                     "streaming_summary": {
@@ -153,7 +182,7 @@ def streaming_summary(context):
             "max_bpm": max_bpm,
             "min_bpm": min_bpm,
             "time_range": f"{earliest} -> {latest}",
-            "computed_at": datetime.utcnow().isoformat() + "Z",
+            "computed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }
 
         context.log.info(
