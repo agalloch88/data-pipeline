@@ -13,18 +13,26 @@ import duckdb
 from dagster import (
     RunRequest,
     SensorEvaluationContext,
+    SkipReason,
     asset,
     define_asset_job,
     sensor,
 )
 
-# Default path — matches consumer.py logic
-DEFAULT_DB_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data",
-    "streaming_events.duckdb",
-)
-DB_PATH = os.environ.get("STREAMING_DB_PATH", DEFAULT_DB_PATH)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def resolve_db_path() -> str:
+    override = os.environ.get("DUCKDB_PATH")
+    if override:
+        return override
+    preferred = os.path.join(BASE_DIR, "data", "health_analytics.duckdb")
+    if os.path.exists(preferred):
+        return preferred
+    return os.path.join(BASE_DIR, "data", "streaming_events.duckdb")
+
+
+DB_PATH = resolve_db_path()
 
 
 def _get_latest_event_id(db_path: str) -> int:
@@ -38,6 +46,24 @@ def _get_latest_event_id(db_path: str) -> int:
         return 0
 
 
+def _table_exists(db_path: str, table_name: str) -> bool:
+    try:
+        con = duckdb.connect(db_path, read_only=True)
+        result = con.execute(
+            """
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_name = ?
+            LIMIT 1
+            """,
+            [table_name],
+        ).fetchone()
+        con.close()
+        return bool(result)
+    except Exception:
+        return False
+
+
 @sensor(
     job=define_asset_job("streaming_summary_job", selection=["streaming_summary"]),
     minimum_interval_seconds=30,
@@ -47,14 +73,25 @@ def streaming_events_sensor(context: SensorEvaluationContext):
     """
     Fires a RunRequest when new streaming events arrive in DuckDB.
 
-    Cursor tracks the last processed event ID.
+    Cursor tracks the last processed event ID under `last_event_id`.
     """
-    last_id = int(context.cursor or 0)
+    last_event_id = int(context.cursor or 0)
+
+    if not os.path.exists(DB_PATH):
+        yield SkipReason(f"DuckDB not found at {DB_PATH}")
+        return
+
+    if not _table_exists(DB_PATH, "streaming_events"):
+        yield SkipReason("streaming_events table not found yet")
+        return
+
     current_id = _get_latest_event_id(DB_PATH)
 
-    if current_id > last_id:
-        new_count = current_id - last_id
-        context.log.info(f"Detected {new_count} new streaming events (IDs {last_id + 1} to {current_id})")
+    if current_id > last_event_id:
+        new_count = current_id - last_event_id
+        context.log.info(
+            f"Detected {new_count} new streaming events (IDs {last_event_id + 1} to {current_id})"
+        )
         context.update_cursor(str(current_id))
         yield RunRequest(
             run_key=f"streaming-{current_id}",
@@ -62,7 +99,7 @@ def streaming_events_sensor(context: SensorEvaluationContext):
                 "ops": {
                     "streaming_summary": {
                         "config": {
-                            "last_processed_id": last_id,
+                            "last_processed_id": last_event_id,
                             "current_id": current_id,
                         }
                     }
@@ -70,21 +107,21 @@ def streaming_events_sensor(context: SensorEvaluationContext):
             },
         )
     else:
-        context.log.debug(f"No new events (max_id={current_id}, cursor={last_id})")
+        yield SkipReason(f"No new events (max_id={current_id}, cursor={last_event_id})")
 
 
 @asset(
     description="Computes rolling statistics over the last 100 streaming heart rate events.",
     group_name="streaming",
 )
-def streaming_summary():
+def streaming_summary(context):
     """
     Reads the most recent 100 streaming events from DuckDB and logs summary statistics.
 
     Stats: avg BPM, max BPM, min BPM, event count, time range.
     """
     if not os.path.exists(DB_PATH):
-        print(f"STREAMING SUMMARY: Database not found at {DB_PATH}. Consumer may not have run yet.")
+        context.log.warning(f"Database not found at {DB_PATH}. Consumer may not have run yet.")
         return {"status": "no_data"}
 
     try:
@@ -106,7 +143,7 @@ def streaming_summary():
         con.close()
 
         if not result or result[0] == 0:
-            print("STREAMING SUMMARY: No events in streaming_events table yet.")
+            context.log.info("No events in streaming_events table yet.")
             return {"status": "empty"}
 
         count, avg_bpm, max_bpm, min_bpm, earliest, latest = result
@@ -119,14 +156,18 @@ def streaming_summary():
             "computed_at": datetime.utcnow().isoformat() + "Z",
         }
 
-        print(f"STREAMING SUMMARY (last {count} events):")
-        print(f"  Avg BPM : {avg_bpm}")
-        print(f"  Max BPM : {max_bpm}")
-        print(f"  Min BPM : {min_bpm}")
-        print(f"  Range   : {earliest} -> {latest}")
+        context.log.info(
+            "Streaming summary last %s events | avg=%s max=%s min=%s range=%s -> %s",
+            count,
+            avg_bpm,
+            max_bpm,
+            min_bpm,
+            earliest,
+            latest,
+        )
 
         return summary
 
     except Exception as exc:
-        print(f"STREAMING SUMMARY: Error reading events — {exc}")
+        context.log.error(f"Error reading events: {exc}")
         return {"status": "error", "message": str(exc)}
