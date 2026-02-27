@@ -1,236 +1,230 @@
-# Data Engineering Portfolio Project: Multi-Source Health & Activity Analytics Pipeline
+# Architecture Decision Records
 
-## Executive Summary
+This document captures the architectural decisions made during the design and build of the Multi-Source Health and Activity Analytics Pipeline. Each record explains the problem context, the decision made, the alternatives considered, and the tradeoffs accepted.
 
-This portfolio project demonstrates end-to-end data engineering skills through a modern, asset-centric pipeline that combines personal health data (Oura Ring), weather patterns (OpenWeatherMap), and software development activity (GitHub) to create a comprehensive personal analytics dashboard. The architecture leverages cutting-edge tools and demonstrates real-world data engineering best practices.
-
-**What makes this impressive:** Unlike typical DE portfolios using toy datasets, this combines personal health data with environmental and behavioral patterns, showcasing data storytelling, privacy-conscious design, and modern Python-native orchestration.
+These are written for two audiences: future maintainers of this project, and anyone evaluating this codebase as a portfolio piece. Where a decision would differ in a production environment, that context is noted explicitly.
 
 ---
 
-## 🎯 Data Sources Selection
+## ADR Index
 
-### 1. Oura Ring API (Primary - Personal Health Data)
-- **Why:** Ryan owns an Oura Ring, making this authentic personal data
-- **Data richness:** Sleep stages, heart rate variability, activity levels, readiness scores
-- **API limits:** 5,000 requests per 5-minute period (very generous)
-- **Updates:** Multiple times daily (sleep, activity, readiness)
-- **Uniqueness:** Personal health data pipelines are rare in portfolios
-- **Data types:** Sleep metrics, activity data, readiness scores, heart rate data
-
-### 2. OpenWeatherMap API (Environmental Context)
-- **Why:** Weather correlates with sleep quality, activity levels, mood
-- **Data richness:** Current conditions, forecasts, air quality, UV index
-- **API limits:** 1,000 calls per day (sufficient for hourly collection)
-- **Updates:** Hourly updates available
-- **Business value:** Environmental factors impact health and productivity
-- **Data types:** Temperature, humidity, air quality, precipitation, UV index
-
-### 3. GitHub API (Professional Activity)
-- **Why:** Developer activity patterns, productivity cycles, work-life balance
-- **Data richness:** Commits, pull requests, issue activity, repository metrics
-- **API limits:** 5,000 requests per hour (authenticated)
-- **Updates:** Real-time as development happens
-- **Portfolio relevance:** Shows understanding of developer workflow data
-- **Data types:** Commit frequency, coding hours, repository activity, collaboration metrics
+| ID | Title | Status |
+|----|-------|--------|
+| [ADR-001](#adr-001-duckdb-as-the-analytical-store) | DuckDB as the Analytical Store | Accepted |
+| [ADR-002](#adr-002-dagster-over-airflow-for-orchestration) | Dagster over Airflow for Orchestration | Accepted |
+| [ADR-003](#adr-003-dbt-core-over-dbt-cloud) | dbt Core over dbt Cloud | Accepted |
+| [ADR-004](#adr-004-medallion-architecture-for-data-modeling) | Medallion Architecture for Data Modeling | Accepted |
+| [ADR-005](#adr-005-kafka-streaming-component) | Kafka Streaming Component | Accepted |
 
 ---
 
-## 🏗️ Architecture Stack
+## ADR-001: DuckDB as the Analytical Store
 
-### **Orchestration: Dagster** ⭐
-**Rationale:** Asset-centric approach perfect for data engineering portfolios
-- **Why over Prefect:** Data assets as first-class citizens, better for data-focused workflows
-- **Modern approach:** Software-defined assets (SDAs) vs traditional task DAGs
-- **Portfolio appeal:** Shows understanding of next-gen orchestration paradigms
-- **Features:** Built-in data quality monitoring, asset lineage, type safety
-- **Learning curve:** Medium, but demonstrates advanced DE thinking
+**Status:** Accepted
 
-### **Storage: DuckDB** ⭐
-**Rationale:** Lightweight, high-performance analytics database
-- **Why over Supabase:** Better for analytics workloads, no hosting costs
-- **Performance:** Columnar storage, vectorized execution, excellent for aggregations
-- **Portfolio benefits:** Shows understanding of OLAP vs OLTP trade-offs
-- **Local development:** Easy setup, no cloud dependencies
-- **dbt compatibility:** Native support, excellent performance
+### Context
 
-### **Transformation: dbt Core**
-**Rationale:** Industry standard, demonstrates SQL skills and data modeling
-- **Medallion architecture:** Bronze (raw) → Silver (cleaned) → Gold (business logic)
-- **Version control:** Git-based workflow, code reviews
-- **Testing:** Built-in data quality tests
-- **Documentation:** Auto-generated docs with lineage graphs
+The pipeline processes health metrics, GitHub activity, and weather data to produce analytical marts. The workload is read-heavy and analytical: aggregations over time-series data, multi-table joins, column-oriented scans. The project is local-first and solo-developer, with no multi-user concurrency requirement. Cost is a real constraint for a portfolio project.
 
-### **Ingestion: Custom Python Scripts**
-**Rationale:** More impressive than drag-and-drop tools, shows coding skills
-- **API clients:** Custom async Python for each data source
-- **Error handling:** Retry logic, rate limiting, graceful failures
-- **Data validation:** Pydantic models for type safety
-- **Incremental loads:** Track watermarks, avoid duplicate data
+### Decision
 
-### **Visualization: Evidence.dev** ⭐
-**Rationale:** Modern BI-as-code tool, differentiates from typical Streamlit portfolios
-- **Why over Streamlit:** Better for report-style dashboards, SQL-native
-- **Git-based:** Dashboards in version control
-- **Performance:** Pre-computed queries, fast loading
-- **Professional look:** Clean, report-style layouts
+Use DuckDB as the primary data warehouse.
+
+DuckDB is an embedded, in-process OLAP database with no server to provision or manage. It reads and writes Parquet natively, runs columnar scans efficiently, and supports the full SQL standard including window functions and complex aggregations. For this workload and this scale, it is the right tool.
+
+### Alternatives Considered
+
+**Snowflake.** The production standard for cloud data warehousing. Excellent for multi-user concurrency, near-unlimited scale, and enterprise feature sets. Rejected because a portfolio project does not need a $500/month warehouse. The skills signal here is knowing *when* Snowflake is worth its cost, not running it for 50MB of personal health data.
+
+**BigQuery.** Strong managed OLAP with serverless pricing. Adds GCP vendor dependency, requires cloud credentials in CI, and introduces network latency for every query. The free tier is viable but constraining. Rejected for the same reason as Snowflake: the operational overhead does not match the project scale.
+
+**PostgreSQL.** A relational OLTP database, not an OLAP one. PostgreSQL can handle analytical queries, but it is row-oriented and not optimized for the column-scan patterns that dominate this workload. Using PostgreSQL here would demonstrate a category mismatch between workload and tool.
+
+**SQLite.** Embedded and zero-cost like DuckDB, but row-oriented and missing many analytical SQL features. Not designed for this use case.
+
+### Consequences
+
+Accepted tradeoffs:
+- No cloud experience signal from this project alone. A senior engineer reviewing this codebase should read this ADR and understand the decision was deliberate, not a gap.
+- No multi-user concurrency. DuckDB supports one writer at a time. This is fine for a single-developer pipeline; it would be a hard constraint at team scale.
+- No managed infrastructure. All data lives on local disk. Backup and durability are the developer's responsibility.
+
+Benefits gained:
+- Zero cost, zero cloud dependencies, instant local iteration.
+- Full SQL support with window functions, lateral joins, and efficient columnar scans.
+- Tight integration with dbt and Python. DuckDB's Python API makes ad-hoc analysis trivial alongside the pipeline.
+- Demonstrates understanding of OLAP vs. OLTP distinctions, which is the actual skill being signaled.
 
 ---
 
-## 📊 Project Scope & MVP Definition
+## ADR-002: Dagster over Airflow for Orchestration
 
-### **Data Models (7 dbt models)**
+**Status:** Accepted
 
-#### Bronze Layer (Raw Data)
-1. `bronze_oura_sleep` - Raw sleep session data
-2. `bronze_oura_activity` - Raw daily activity metrics
-3. `bronze_weather_hourly` - Raw hourly weather observations
-4. `bronze_github_commits` - Raw commit and repository activity
+### Context
 
-#### Silver Layer (Cleaned & Enriched)
-5. `silver_daily_health_metrics` - Cleaned daily health aggregations
-6. `silver_weather_daily` - Daily weather summaries with derived metrics
+The pipeline needs an orchestrator to schedule and coordinate extract, load, and transform steps across three data sources. The orchestrator should handle dependency management, provide observability, and model the pipeline in a way that reflects how data engineering actually works: data assets with lineage, not task graphs with execution order.
 
-#### Gold Layer (Business Logic)
-7. `gold_health_weather_correlations` - Combined health + environmental insights
+### Decision
 
-### **Key Visualizations (5 Dashboard Components)**
+Use Dagster with asset-centric definitions.
 
-1. **Sleep Quality Heatmap** - Sleep scores vs weather conditions over time
-2. **Activity vs Weather Correlation** - How weather affects movement patterns
-3. **Productivity Cycles** - GitHub activity patterns vs health metrics
-4. **Weekly Health Trends** - Rolling averages, trend detection
-5. **Environmental Impact Dashboard** - Air quality vs HRV, temperature vs sleep
+Dagster's Software-Defined Assets model fits this pipeline directly. Each stage of the pipeline is an asset: raw API responses, staging tables, intermediate joins, final marts. Dagster tracks which assets are materialized, when they were last updated, and what downstream assets depend on them. Data lineage is built in, not bolted on. The type system catches schema mismatches before they reach downstream consumers.
 
-### **Technical Features**
-- **Automated scheduling:** Daily pipeline runs via Dagster schedules
-- **Data quality monitoring:** dbt tests + Dagster asset checks
-- **Incremental loading:** Only process new data since last run
-- **Error alerting:** Slack notifications for pipeline failures
-- **Performance monitoring:** Pipeline execution metrics and optimization
+### Alternatives Considered
 
----
+**Apache Airflow.** The dominant orchestrator in the industry. Airflow has a massive ecosystem, widespread adoption, and deep integrations with every major cloud platform. It is also DAG-centric and imperative: you define tasks and their execution order, and you wire up dependencies manually. Data lineage requires plugins or external tooling. For a pipeline that is fundamentally about data assets, Airflow's mental model works against the grain. It was rejected here because Dagster's asset model more accurately represents the problem being solved.
 
-## 🚀 Phased Build Plan
+One practical note: Airflow is more frequently listed in job postings. Choosing Dagster is a deliberate bet on the direction the industry is moving, not ignorance of Airflow's prevalence.
 
-### **Phase 1: Foundation (Week 1)**
-- [ ] Set up development environment (Python, dbt, DuckDB, Dagster)
-- [ ] Create API clients for all three data sources
-- [ ] Build basic ingestion pipeline for Oura Ring data
-- [ ] Set up dbt project structure with bronze layer
-- [ ] Create initial data quality tests
+**Prefect.** Modern, developer-friendly, and Python-native. Prefect's flow and task model is closer to Airflow than Dagster in its core abstraction. It has a strong cloud product but a smaller open-source ecosystem than either Airflow or Dagster. Rejected because Dagster's data-aware abstractions are a better fit for an analytically-focused portfolio project.
 
-### **Phase 2: Core Pipeline (Week 2)**
-- [ ] Complete ingestion for weather and GitHub APIs
-- [ ] Build silver layer transformations
-- [ ] Implement incremental loading strategies
-- [ ] Add comprehensive dbt testing suite
-- [ ] Set up Dagster asset materialization
+**cron + Python scripts.** Viable for simple pipelines. Does not provide dependency management, observability, retry logic, or any of the operational scaffolding that makes a pipeline maintainable at scale. Ruled out because the goal is demonstrating engineering judgment, not minimizing tooling.
 
-### **Phase 3: Analytics Layer (Week 3)**
-- [ ] Create gold layer models with business logic
-- [ ] Build correlation analysis between data sources
-- [ ] Implement data quality monitoring
-- [ ] Add performance optimization (indexes, partitioning)
-- [ ] Create Dagster sensors for real-time updates
+### Consequences
 
-### **Phase 4: Visualization & Polish (Week 4)**
-- [ ] Set up Evidence.dev project
-- [ ] Build all 5 key dashboard components
-- [ ] Create comprehensive README with architecture diagrams
-- [ ] Add monitoring and alerting
-- [ ] Deploy to cloud (optional: GitHub Actions + cloud hosting)
+Accepted tradeoffs:
+- Dagster has a smaller job market footprint than Airflow. This is a real cost. Engineers who know only Dagster will find fewer postings that list it by name.
+- Dagster's asset model has a learning curve if you are coming from a task-centric mental model.
+
+Benefits gained:
+- Assets are the right abstraction for data pipelines. The code reads like what it does.
+- Built-in data lineage graph, observable in the Dagster UI without any additional tooling.
+- Type annotations on assets catch integration errors at definition time, not execution time.
+- The `@sensor` primitive integrates cleanly with the streaming component (see ADR-005).
 
 ---
 
-## 🌟 Why This Project Stands Out
+## ADR-003: dbt Core over dbt Cloud
 
-### **1. Personal Data Storytelling**
-- Uses real, personal data rather than contrived datasets
-- Demonstrates privacy-conscious data engineering practices
-- Shows how data engineering enables personal insights
+**Status:** Accepted
 
-### **2. Modern Tool Selection**
-- **Dagster:** Next-generation orchestration (vs outdated Airflow)
-- **DuckDB:** High-performance analytics database
-- **Evidence.dev:** Modern BI-as-code approach
-- Shows awareness of current industry trends
+### Context
 
-### **3. Cross-Domain Data Integration**
-- Health + Environment + Professional activity
-- Demonstrates complex data relationships
-- Shows business value through correlation analysis
+The transform layer requires a framework that supports SQL-based transformations, automated testing, documentation generation, and version control. The project uses a three-layer medallion model with 7 models and 17 data quality tests.
 
-### **4. Production-Ready Practices**
-- Comprehensive testing at every layer
-- Error handling and monitoring
-- Version controlled transformations
-- Performance optimization
+### Decision
 
-### **5. Technical Depth**
-- Custom API integrations (not pre-built connectors)
-- Advanced dbt patterns (incremental models, macros, tests)
-- Asset-centric orchestration paradigm
-- Modern Python practices (async, type hints, Pydantic)
+Use dbt Core, self-managed, executed via Dagster.
 
----
+dbt Core is the open-source foundation of dbt. It handles model compilation, dependency resolution, incremental processing, and the full test suite. Running it via Dagster's `@asset` definitions means transformations are first-class citizens in the orchestration graph, with lineage tracked alongside extraction and loading steps.
 
-## 🎯 Success Metrics
+### Alternatives Considered
 
-### **Technical Metrics**
-- Pipeline reliability: >99% success rate
-- Data freshness: <2 hour latency for all sources
-- Test coverage: >90% of data models have quality tests
-- Performance: Full refresh completes in <5 minutes
+**dbt Cloud.** The managed platform built on top of dbt Core. Adds a hosted scheduler, managed CI/CD, a browser-based IDE, and SSO. These are real features with real value on engineering teams. Rejected for three reasons: cost (free tier is limited), redundancy (Dagster already handles scheduling and orchestration), and the goal of demonstrating hands-on understanding of the transformation layer rather than delegating it to a managed service.
 
-### **Portfolio Impact Metrics**
-- Demonstrates 7+ modern data engineering tools
-- Shows end-to-end pipeline ownership
-- Exhibits both technical skills and business understanding
-- Includes comprehensive documentation and architecture diagrams
+A senior engineer using dbt Cloud at work understands the scheduler, the CI/CD hooks, and the run history. A senior engineer who has operated dbt Core self-managed also understands what dbt Cloud is abstracting for you. This project targets the latter signal.
+
+**Custom SQL scripts.** Rejected outright. No testing framework, no dependency management, no documentation, no incremental model support. Custom SQL scripts would require reinventing everything dbt Core provides.
+
+**SQLMesh.** An emerging alternative with state-aware migrations and a different approach to incremental models. Interesting, but the ecosystem is smaller and the dbt skill signal is more immediately legible to engineering teams.
+
+### Consequences
+
+Accepted tradeoffs:
+- No managed CI/CD. Running `dbt test` in GitHub Actions requires manual configuration.
+- No hosted scheduler. Dagster handles this, which works well but creates a tighter coupling between the orchestrator and the transformation layer.
+
+Benefits gained:
+- Full control over the transformation environment, including package management and profile configuration.
+- Git-native workflow: models, tests, and documentation live in the repository alongside the rest of the pipeline code.
+- Deep understanding of dbt internals: compiled SQL, the ref() dependency system, the test YAML schema, incremental strategies. These are visible in this codebase in ways they would not be in a managed environment.
 
 ---
 
-## 🔧 Implementation Notes
+## ADR-004: Medallion Architecture for Data Modeling
 
-### **Development Environment Setup**
-```bash
-# Core dependencies
-pip install dagster dbt-duckdb evidence-dev requests pydantic
+**Status:** Accepted
 
-# API client libraries
-pip install oura-ring openweather-python pygithub
+### Context
 
-# Development tools
-pip install black flake8 pytest pre-commit
+The pipeline ingests raw JSON from three APIs with different schemas, update frequencies, and quality characteristics. The data needs to be cleaned, joined, and aggregated to produce analytical marts. The modeling pattern should support testing at each stage and make it easy to debug problems by inspecting intermediate state.
+
+### Decision
+
+Use a three-layer medallion architecture: Staging, Intermediate, and Marts.
+
+**Staging** models are 1:1 with source tables. They rename columns, cast types, and apply no business logic. A staging model is a clean, typed representation of the source, nothing more.
+
+**Intermediate** models join and enrich data across sources. The `int_daily_health_weather` model joins sleep metrics, activity data, and weather conditions on the date grain. Joins happen here so they can be tested here.
+
+**Marts** are business-facing aggregations. `mart_daily_wellness` and `mart_weekly_summary` are the outputs that the Streamlit dashboard queries. Marts have the strongest test coverage because they are the layer that end consumers depend on.
+
+This layering means any failure can be localized to a specific stage. A bad join lives in Intermediate. A bad aggregation lives in Marts. Bad source data fails at Staging before it can propagate.
+
+### Alternatives Considered
+
+**Star schema applied directly to raw data.** A dimensional model with fact and dimension tables is a valid pattern for analytical workloads. Rejected here because it assumes cleaner source data than APIs provide. The staging layer exists precisely to normalize API responses before they enter a formal schema.
+
+**One Big Table (OBT).** Denormalized, wide, fast to query. Works well for a narrow set of queries but breaks down as the question set grows. Adding a new join or a new grain means rebuilding the OBT. No separation of concerns, no intermediate testability. Rejected.
+
+**Ad-hoc CTEs in the mart layer.** Pulling raw data directly into mart models via CTEs without a staging layer. This works in small projects but makes the transformation logic impossible to test at intermediate stages. Debugging a mart failure requires tracing back through all the CTEs. Rejected because testability at each layer is a design requirement.
+
+### Consequences
+
+Accepted tradeoffs:
+- More models to maintain. Seven models for two marts is more than the minimum, but each model is simple and independently testable.
+- Intermediate state stored in the database. More disk usage, but invaluable for debugging.
+
+Benefits gained:
+- Each layer is independently testable. The 17-test suite is distributed across staging (8 tests), intermediate (3 tests), and marts (6 tests).
+- Schema changes in source APIs fail at the staging layer, not in the mart. This is the design intent of the staging abstraction.
+- The model structure is immediately legible to any data engineer familiar with medallion architecture. The pattern is a communication tool as much as a technical one.
+
+---
+
+## ADR-005: Kafka Streaming Component
+
+**Status:** Accepted
+
+### Context
+
+The batch pipeline demonstrates ELT, orchestration, data modeling, and testing. It does not demonstrate real-time event processing. Stream processing is a distinct skill set with distinct tooling, and the absence of any streaming component would be a visible gap for roles that involve real-time data.
+
+The decision was to extend the portfolio with a streaming mini-project that integrates with the existing batch infrastructure rather than building a separate standalone project.
+
+### Decision
+
+Add a Kafka-based streaming pipeline alongside the batch pipeline, sharing the DuckDB store and the Dagster orchestration layer.
+
+The architecture:
+
+```
+Producer (synthetic heart rate events)
+  -> Kafka broker (Docker Compose)
+    -> Consumer (writes to DuckDB)
+      -> Dagster sensor (monitors event count)
+        -> streaming_summary asset (materialized on threshold)
 ```
 
-### **Key Architecture Decisions**
-1. **Local-first development:** DuckDB enables full local testing
-2. **Asset-centric orchestration:** Dagster SDAs over traditional DAGs
-3. **SQL-heavy transformations:** dbt for data modeling, Python for ingestion only
-4. **Markdown-based reporting:** Evidence.dev for maintainable dashboards
+The producer generates synthetic `heart_rate_sample` events using a normal distribution (mean 72 bpm, std 6, clipped 55 to 120) at a configurable rate. The consumer uses consumer group semantics, committing offsets after each write so it can resume without data loss after a restart. The Dagster sensor polls the event count in DuckDB and materializes the `streaming_summary` asset when the threshold is met.
 
-### **Scalability Considerations**
-- DuckDB handles millions of rows efficiently for this use case
-- Easy migration path to MotherDuck for cloud scaling
-- Dagster supports distributed execution when needed
-- API rate limits sufficient for personal use case
+Using DuckDB as the streaming sink is a deliberate design choice. It demonstrates the lakehouse pattern: one analytical store handling both batch and streaming writes. In production, you might separate these concerns with a dedicated streaming store. At this scale, keeping a single store reduces operational complexity and makes the integration more legible.
+
+### Alternatives Considered
+
+**Flink.** The production standard for stateful stream processing. Rich API, exactly-once semantics, complex event processing. Rejected because the scope here is demonstrating streaming ingestion and integration, not stateful stream processing. Flink would be the right tool for windowed aggregations over high-volume streams.
+
+**Spark Structured Streaming.** Strong for micro-batch processing with Spark compatibility. Heavier operationally than Kafka plus a lightweight consumer. Rejected for the same reason as Flink: the goal is integration, not volume.
+
+**Redis Streams.** Lightweight and fast. Smaller ecosystem and less commonly cited in data engineering roles than Kafka. Rejected because Kafka is the dominant streaming platform in production DE environments, and this project should signal familiarity with it.
+
+**A separate standalone streaming project.** Keeping the streaming work isolated from the batch pipeline would mean duplicating infrastructure and losing the integration story. The Dagster sensor connecting the streaming events to a materialized asset is the interesting part. That connection only exists because the two components share a platform.
+
+### Consequences
+
+Accepted tradeoffs:
+- Docker Compose dependency. Running the streaming component requires a local Docker installation for the Kafka broker.
+- Single-partition topic. The current configuration supports one active consumer. Horizontal scaling would require adding partitions and consumer instances, which is straightforward but not demonstrated here.
+- Synthetic data. The producer generates simulated heart rate events. The streaming component demonstrates the pattern, not a live data source.
+
+Benefits gained:
+- The portfolio now demonstrates both batch and streaming competencies in a single cohesive project.
+- Kafka consumer group semantics, offset management, and at-least-once delivery are all demonstrated in the consumer implementation.
+- The Dagster sensor integration shows how to bridge a streaming component into an asset-centric orchestration model, which is a real architectural problem in production pipelines.
+- The DuckDB-as-streaming-sink pattern demonstrates the lakehouse architecture: one analytical store, two ingestion paths.
 
 ---
 
-## 📈 Future Enhancement Opportunities
-
-### **Phase 2 Expansions (Post-Portfolio)**
-- Add financial data (bank transactions, investment performance)
-- Integrate social media sentiment analysis
-- Include nutrition tracking (MyFitnessPal API)
-- Add machine learning predictions (sleep quality forecasting)
-
-### **Technical Improvements**
-- Containerization with Docker
-- CI/CD pipeline with GitHub Actions
-- Real-time streaming with Kafka
-- Advanced analytics with ML pipelines
-
-This architecture demonstrates comprehensive data engineering skills while creating genuine business value through personal health and productivity insights. The combination of modern tooling, real data sources, and production-ready practices makes it a standout portfolio piece in today's competitive market.
+*Last updated: 2026-02-27*
+*Author: Ryan Kirsch*
