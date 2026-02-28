@@ -1,0 +1,34 @@
+{
+  "expectation_suite_name": "oura_activity_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_table_columns_to_contain_set",
+      "kwargs": {
+        "column_set": ["id", "day", "activity_score", "active_calories", "total_calories", "steps", "sedentary_time"]
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "id" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "day" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "activity_score", "min_value": 0, "max_value": 100, "mostly": 0.95 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "steps", "min_value": 0, "max_value": 100000, "mostly": 0.95 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "active_calories", "min_value": 0, "max_value": 10000, "mostly": 0.95 }
+    }
+  ],
+  "meta": {
+    "great_expectations_version": "0.18.8"
+  }
+}

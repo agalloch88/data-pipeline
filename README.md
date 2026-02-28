@@ -262,9 +262,9 @@ Great Expectations provides data validation plus data docs for observability, ma
 
 ### Validation Suites
 
-- **orders_suite**: required columns present, `order_id` and `customer_id` are non-null, `amount` > 0
-- **customers_suite**: required columns present, `customer_id` is non-null and unique, `email` matches expected format
-- **products_suite**: required columns present, `product_name` is non-null, `price` > 0, `category` is in the allowed set
+- **oura_sleep_suite**: required columns present (`id`, `day`, `total_sleep_duration`, etc.), non-null primary keys, sleep efficiency 0-100%, heart rate bounds (30-140 BPM), sleep duration under 24 hours
+- **oura_activity_suite**: required columns present (`id`, `day`, `activity_score`, `steps`, etc.), non-null primary keys, activity score 0-100, step count bounds, calorie validation
+- **weather_daily_suite**: required columns present (`dt`, `temp_kelvin`, `humidity`, etc.), temperature in physical range (200-340K), humidity 0-100%, barometric pressure bounds
 
 ### Running Great Expectations
 
@@ -272,14 +272,11 @@ Great Expectations provides data validation plus data docs for observability, ma
 # Activate environment
 source ~/python-env/bin/activate
 
-# Run validations from repo root
+# Run validations against DuckDB staging data
 python scripts/validate_data.py
 ```
 
-Expected input CSV files under `data/`:
-- `data/orders.csv`
-- `data/customers.csv`
-- `data/products.csv`
+Reads directly from `data/pipeline.duckdb` staging tables (no CSV export needed). Requires the Dagster pipeline to have run at least once to populate data.
 
 **Environment caveat**: Great Expectations `0.18.8` on Python `3.14` may fail to import. If you hit import errors, use Python `<=3.13` or upgrade Great Expectations to a compatible version.
 

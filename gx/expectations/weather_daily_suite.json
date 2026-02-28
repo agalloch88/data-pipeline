@@ -1,0 +1,34 @@
+{
+  "expectation_suite_name": "weather_daily_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_table_columns_to_contain_set",
+      "kwargs": {
+        "column_set": ["dt", "temp_kelvin", "humidity", "pressure", "wind_speed"]
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "dt" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "temp_kelvin", "min_value": 200, "max_value": 340, "mostly": 0.95 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "humidity", "min_value": 0, "max_value": 100, "mostly": 0.95 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "pressure", "min_value": 870, "max_value": 1084, "mostly": 0.95 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "wind_speed", "min_value": 0, "max_value": 200, "mostly": 0.95 }
+    }
+  ],
+  "meta": {
+    "great_expectations_version": "0.18.8"
+  }
+}

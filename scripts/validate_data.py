@@ -1,4 +1,4 @@
-"""Run Great Expectations validations against staging data."""
+"""Run Great Expectations validations against health pipeline staging data."""
 
 from __future__ import annotations
 
@@ -7,11 +7,13 @@ from pathlib import Path
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 GX_DIR = Path(__file__).resolve().parents[1] / "gx"
+DB_PATH = DATA_DIR / "pipeline.duckdb"
 
-SUITE_TO_CSV = {
-    "orders_suite": "orders.csv",
-    "customers_suite": "customers.csv",
-    "products_suite": "products.csv",
+# Maps suite name to the DuckDB staging query
+SUITE_TO_QUERY = {
+    "oura_sleep_suite": "SELECT * FROM main.stg_oura_sleep",
+    "oura_activity_suite": "SELECT * FROM main.stg_oura_activity",
+    "weather_daily_suite": "SELECT * FROM main.stg_weather_daily",
 }
 
 
@@ -19,15 +21,21 @@ def _print_error(message: str) -> None:
     print(message, file=sys.stderr)
 
 
-def _load_dataframe(csv_path: Path):
+def _load_dataframe(query: str):
     import duckdb
 
-    connection = duckdb.connect(database=":memory:")
+    if not DB_PATH.exists():
+        _print_error(f"ERROR: DuckDB database not found at {DB_PATH}")
+        _print_error("Run the Dagster pipeline first to populate data.")
+        return None
+
+    connection = duckdb.connect(database=str(DB_PATH), read_only=True)
     try:
-        return connection.execute(
-            "select * from read_csv_auto(?)",
-            [str(csv_path)],
-        ).df()
+        return connection.execute(query).df()
+    except Exception as exc:
+        _print_error(f"ERROR: Query failed: {query}")
+        _print_error(f"Details: {exc.__class__.__name__}: {exc}")
+        return None
     finally:
         connection.close()
 
@@ -35,7 +43,7 @@ def _load_dataframe(csv_path: Path):
 def _get_context():
     try:
         import great_expectations as gx
-    except Exception as exc:  # pragma: no cover - runtime compatibility guard
+    except Exception as exc:
         _print_error("ERROR: Great Expectations failed to import.")
         _print_error(
             "This environment uses Python 3.14, and Great Expectations 0.18.8 may "
@@ -54,20 +62,9 @@ def _get_context():
 
 
 def main() -> int:
-    missing = [
-        csv_name
-        for csv_name in SUITE_TO_CSV.values()
-        if not (DATA_DIR / csv_name).exists()
-    ]
-
-    if missing:
-        _print_error("Missing expected CSV sources under data/:")
-        for csv_name in missing:
-            _print_error(f"- data/{csv_name}")
-        _print_error(
-            "Safer behavior: not generating sample data automatically. "
-            "Create the CSVs above to run validations."
-        )
+    if not DB_PATH.exists():
+        _print_error(f"DuckDB database not found at {DB_PATH}")
+        _print_error("Run the Dagster pipeline first: dagster dev")
         return 2
 
     context = _get_context()
@@ -80,9 +77,15 @@ def main() -> int:
         datasource = context.sources.add_pandas(name="pandas")
 
     overall_success = True
-    for suite_name, csv_name in SUITE_TO_CSV.items():
-        csv_path = DATA_DIR / csv_name
-        dataframe = _load_dataframe(csv_path)
+    for suite_name, query in SUITE_TO_QUERY.items():
+        dataframe = _load_dataframe(query)
+        if dataframe is None:
+            _print_error(f"SKIP: {suite_name} (no data)")
+            continue
+
+        if dataframe.empty:
+            print(f"{suite_name}: SKIP (0 rows)")
+            continue
 
         asset = datasource.add_dataframe_asset(name=suite_name)
         batch_request = asset.build_batch_request(dataframe=dataframe)
@@ -104,7 +107,8 @@ def main() -> int:
         success = bool(result.get("success"))
         overall_success = overall_success and success
         status = "PASS" if success else "FAIL"
-        print(f"{suite_name}: {status}")
+        rows = len(dataframe)
+        print(f"{suite_name}: {status} ({rows} rows)")
 
         if not success:
             stats = result.get("statistics", {})

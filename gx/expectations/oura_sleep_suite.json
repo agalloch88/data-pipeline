@@ -1,0 +1,38 @@
+{
+  "expectation_suite_name": "oura_sleep_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_table_columns_to_contain_set",
+      "kwargs": {
+        "column_set": ["id", "day", "total_sleep_duration", "rem_sleep_duration", "deep_sleep_duration", "efficiency", "hr_lowest", "hr_average"]
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "id" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "day" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "efficiency", "min_value": 0, "max_value": 100, "mostly": 0.95 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "hr_lowest", "min_value": 30, "max_value": 120, "mostly": 0.95 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "hr_average", "min_value": 40, "max_value": 140, "mostly": 0.95 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "total_sleep_duration", "min_value": 0, "max_value": 86400, "mostly": 0.95 }
+    }
+  ],
+  "meta": {
+    "great_expectations_version": "0.18.8"
+  }
+}
