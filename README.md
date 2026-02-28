@@ -4,6 +4,7 @@
 [![Dagster](https://img.shields.io/badge/Dagster-1.x-orange.svg)](https://dagster.io)
 [![dbt](https://img.shields.io/badge/dbt-Core-red.svg)](https://getdbt.com)
 [![DuckDB](https://img.shields.io/badge/DuckDB-OLAP-yellow.svg)](https://duckdb.org)
+[![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-Streaming-black.svg)](https://kafka.apache.org)
 [![Tests](https://img.shields.io/badge/dbt%20tests-17%20passing-green.svg)]()
 
 A production-ready ELT pipeline that correlates personal health metrics, coding activity, and environmental data to derive actionable wellness insights. Built with modern data engineering practices including asset-centric orchestration, medallion architecture, and comprehensive data quality testing.
@@ -29,6 +30,29 @@ A production-ready ELT pipeline that correlates personal health metrics, coding 
 Data Flow: API → Raw JSON → Staging → Intermediate → Data Marts → Analytics
 ```
 
+## Real-Time Streaming Extension
+
+Built on top of the batch pipeline, a Kafka-based streaming layer adds real-time event ingestion:
+
+```
+┌──────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  Kafka Producer  │    │   Kafka Broker   │    │    Consumer     │
+├──────────────────┤    ├──────────────────┤    ├─────────────────┤
+│ Heart rate events│───▶│ health-events    │───▶│ Kafka → DuckDB  │
+│ (simulated Oura) │    │ (1 partition)    │    │ writer          │
+└──────────────────┘    └──────────────────┘    └─────────────────┘
+                                                         │
+                                              ┌──────────▼──────────┐
+                                              │   Dagster Sensor    │
+                                              │ streaming_events_   │
+                                              │     sensor (30s)    │
+                                              │ → streaming_summary │
+                                              │       asset         │
+                                              └─────────────────────┘
+```
+
+**What it demonstrates:** Event-driven architecture, Kafka consumer groups, DuckDB as a unified batch+streaming sink (lakehouse pattern), Dagster sensor-based orchestration.
+
 ## What This Demonstrates
 
 **Core Data Engineering Competencies:**
@@ -38,6 +62,7 @@ Data Flow: API → Raw JSON → Staging → Intermediate → Data Marts → Anal
 - **Data Quality**: Comprehensive test suite with 17 dbt tests covering completeness, uniqueness, and referential integrity
 - **Database Selection**: DuckDB for OLAP workloads, demonstrating understanding of analytical vs transactional systems
 - **Real-World Application**: Production-grade pipeline processing actual personal data, not synthetic datasets
+- **Real-Time Streaming**: Kafka-based event pipeline extending the batch system with live ingestion, consumer group semantics, and DuckDB as a unified analytical + streaming sink
 
 **Technical Architecture:**
 - **Declarative Transformations**: SQL-based transformations with dbt for maintainability and version control
@@ -50,6 +75,7 @@ Data Flow: API → Raw JSON → Staging → Intermediate → Data Marts → Anal
 - **Orchestration**: Dagster (asset-centric data pipelines)
 - **Transformation**: dbt Core (SQL-based ELT with testing framework)
 - **Warehouse**: DuckDB (columnar analytical database)
+- **Streaming**: Apache Kafka (event-driven pipeline extension)
 - **Runtime**: Python 3.13
 - **Visualization**: Streamlit (interactive dashboard)
 - **Data Sources**: Oura Ring API v2, GitHub Events API, OpenWeatherMap API
@@ -155,6 +181,26 @@ The pipeline runs on a configurable schedule with the following stages:
 3. **Transform**: dbt models process data through medallion architecture layers
 4. **Quality**: Automated testing validates data integrity and business rules
 5. **Serve**: Analytical marts power Streamlit dashboard and ad-hoc queries
+
+## Quick Start: Streaming Extension
+
+> **Prerequisites**: Docker + Docker Compose installed
+
+```bash
+# 1. Start Kafka + Zookeeper
+cd streaming && docker-compose up -d
+
+# 2. Start the consumer (Kafka → DuckDB)
+python streaming/consumer.py
+
+# 3. Start the producer (synthetic heart rate events)
+python streaming/producer.py
+
+# 4. Verify events flowing
+duckdb data/streaming_events.duckdb -c "SELECT COUNT(*), AVG(bpm) FROM streaming_events"
+```
+
+See [streaming/README.md](streaming/README.md) for full configuration options and Dagster integration.
 
 ## Data Quality and Testing
 
