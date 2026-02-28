@@ -123,17 +123,6 @@ def streaming_events_sensor(context: SensorEvaluationContext):
         context.update_cursor(str(current_id))
         yield RunRequest(
             run_key=f"streaming-{current_id}",
-            # Intentionally kept for future incremental processing.
-            run_config={
-                "ops": {
-                    "streaming_summary": {
-                        "config": {
-                            "last_processed_id": last_event_id,
-                            "current_id": current_id,
-                        }
-                    }
-                }
-            },
         )
     else:
         yield SkipReason(f"No new events (max_id={current_id}, cursor={last_event_id})")
