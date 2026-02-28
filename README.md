@@ -136,7 +136,7 @@ mart_weekly_summary     -- Aggregated weekly trends and correlations
    cd data-pipeline
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
 2. **Configure environment variables:**
@@ -154,7 +154,7 @@ mart_weekly_summary     -- Aggregated weekly trends and correlations
    python scripts/init_db.py
    
    # Run dbt transformations
-   cd dbt_transform
+   cd dbt_project
    dbt deps
    dbt run
    dbt test
@@ -168,7 +168,7 @@ mart_weekly_summary     -- Aggregated weekly trends and correlations
 
 5. **Launch Streamlit dashboard:**
    ```bash
-   streamlit run streamlit_app.py
+   streamlit run dashboard.py
    # Access dashboard at http://localhost:8501
    ```
 

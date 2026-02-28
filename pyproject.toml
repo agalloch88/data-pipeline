@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "data-pipeline"
 version = "0.1.0"
-description = "Multi-source health & activity analytics pipeline — Oura + Weather + GitHub → DuckDB → dbt → Evidence.dev"
+description = "Multi-source health & activity analytics pipeline: Oura + Weather + GitHub → DuckDB → dbt → Streamlit"
 requires-python = ">=3.10"
 dependencies = [
     "dagster>=1.6.0",
