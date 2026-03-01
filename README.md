@@ -7,6 +7,8 @@
 [![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-Streaming-black.svg)](https://kafka.apache.org)
 [![Tests](https://img.shields.io/badge/dbt%20tests-17%20passing-green.svg)]()
 
+A production-ready ELT pipeline that ingests personal health metrics, coding activity, and environmental data from three live APIs, transforms them through a medallion architecture (staging → intermediate → marts), and serves correlational wellness insights via a Streamlit dashboard. Built to demonstrate senior-level data engineering: asset-centric orchestration with Dagster, SQL-first transformations with dbt Core, analytical storage in DuckDB, and real-time streaming via Apache Kafka.
+
 A production-ready ELT pipeline that correlates personal health metrics, coding activity, and environmental data to derive actionable wellness insights. Built with modern data engineering practices including asset-centric orchestration, medallion architecture, and comprehensive data quality testing.
 
 ## Architecture Overview
@@ -278,7 +280,7 @@ python scripts/validate_data.py
 
 Reads directly from `data/pipeline.duckdb` staging tables (no CSV export needed). Requires the Dagster pipeline to have run at least once to populate data.
 
-**Environment caveat**: Great Expectations `0.18.8` on Python `3.14` may fail to import. If you hit import errors, use Python `<=3.13` or upgrade Great Expectations to a compatible version.
+**Python version note**: Developed and tested on Python 3.13. If you are using Python 3.14, pin to 3.13 via pyenv local 3.13 before installing dependencies. Great Expectations 0.18.x has not yet published a 3.14-compatible wheel.
 
 ## Performance Considerations
 
