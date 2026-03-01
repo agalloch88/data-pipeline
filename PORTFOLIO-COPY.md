@@ -1,9 +1,0 @@
-# Multi-Source Health and Activity Analytics Pipeline
-
-## Card Description (Portfolio Grid)
-
-I built an end-to-end ELT pipeline that ingests real data from three APIs (Oura Ring, GitHub, OpenWeatherMap) and transforms it through a medallion architecture using Dagster and dbt Core. The system orchestrates data flow with asset-centric design, maintains quality through 17 automated dbt tests, and visualizes wellness correlations in a Streamlit dashboard. This demonstrates production-ready data engineering with modern tooling: DuckDB for OLAP analytics, Python for processing, and comprehensive testing for reliability.
-
-## Detail Description (Full View)
-
-I architected and implemented a comprehensive health and activity analytics pipeline that demonstrates end-to-end data engineering capabilities using production-grade tools and real-world data sources. The system ingests data from three live APIs: Oura Ring for biometric health data, GitHub for development activity tracking, and OpenWeatherMap for environmental context, processing this information through a medallion architecture with staging, intermediate, and mart layers. Built with Dagster for asset-centric orchestration (showcasing next-generation thinking beyond traditional Airflow approaches), dbt Core for SQL-based transformations, and DuckDB as the OLAP warehouse for analytical workloads, the pipeline maintains data quality through 17 comprehensive dbt tests and surfaces insights through an interactive Streamlit dashboard that reveals correlations between wellness metrics, coding productivity, and environmental factors. This project exemplifies modern data stack implementation with thoughtful database selection, robust testing practices, and clean separation of concerns across the ELT process.

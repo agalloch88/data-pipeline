@@ -29,3 +29,10 @@ test-env.ipynb
 
 # macOS
 .DS_Store
+
+# Internal docs (not for public repo)
+CODE-REVIEW.md
+PORTFOLIO-COPY.md
+README-DRAFT.md
+KNOX-QA-*.md
+RECRUITER-READINESS-REVIEW-*.md
