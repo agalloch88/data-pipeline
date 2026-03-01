@@ -9,8 +9,6 @@
 
 A production-ready ELT pipeline that ingests personal health metrics, coding activity, and environmental data from three live APIs, transforms them through a medallion architecture (staging → intermediate → marts), and serves correlational wellness insights via a Streamlit dashboard. Built to demonstrate senior-level data engineering: asset-centric orchestration with Dagster, SQL-first transformations with dbt Core, analytical storage in DuckDB, and real-time streaming via Apache Kafka.
 
-A production-ready ELT pipeline that correlates personal health metrics, coding activity, and environmental data to derive actionable wellness insights. Built with modern data engineering practices including asset-centric orchestration, medallion architecture, and comprehensive data quality testing.
-
 ## Architecture Overview
 
 ```
