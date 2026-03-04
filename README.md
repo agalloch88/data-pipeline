@@ -53,6 +53,40 @@ Built on top of the batch pipeline, a Kafka-based streaming layer adds real-time
 
 **What it demonstrates:** Event-driven architecture, Kafka consumer groups, DuckDB as a unified batch+streaming sink (lakehouse pattern), Dagster sensor-based orchestration.
 
+## Screenshots
+
+### Dagster Asset Graph — Orchestration and Data Lineage
+![Dagster Asset Catalog](screenshots/readme-dagster-assets.png)
+
+*Asset-centric orchestration: full lineage from API ingest through staging, intermediate, and mart layers. Dagster handles dependency resolution, re-execution on failure, and freshness policies.*
+
+### Streamlit Dashboard — Daily Wellness Analytics
+![Daily Wellness Dashboard](screenshots/readme-daily-wellness.png)
+
+*Daily wellness view: sleep quality, readiness scores, activity metrics, and GitHub commit activity in a single analytical surface powered by the mart layer.*
+
+### Sleep Analysis
+![Sleep Analysis](screenshots/readme-sleep.png)
+
+*Sleep trend analysis across REM, deep, and light phases — illustrating the kind of multi-dimensional metric slicing enabled by the medallion architecture.*
+
+### Weekly Summaries
+![Weekly Summaries](screenshots/readme-weekly.png)
+
+*Aggregated weekly trends view built from the `mart_weekly_summary` model.*
+
+### Cross-Domain Correlations
+![Correlations](screenshots/readme-correlations.png)
+
+*Correlational analysis between sleep quality, weather conditions, and coding productivity — the core analytical output of this pipeline.*
+
+### GitHub Activity Integration
+![GitHub Activity](screenshots/readme-github.png)
+
+*GitHub Events API ingestion: commit timing, frequency, and patterns as a proxy for work intensity and recovery cycles.*
+
+---
+
 ## What This Demonstrates
 
 **Core Data Engineering Competencies:**
