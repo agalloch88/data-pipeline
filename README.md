@@ -30,6 +30,14 @@ A production-ready ELT pipeline that ingests personal health metrics, coding act
 Data Flow: API → Raw JSON → Staging → Intermediate → Data Marts → Analytics
 ```
 
+## Architecture Decision Record
+
+- Why Dagster over Airflow: Asset-centric model enables explicit lineage and software-defined partitions for targeted re-materialization.
+- Why DuckDB over Snowflake/Postgres: Zero-infrastructure local OLAP with sub-second analytics and portable, file-backed storage.
+- Why Medallion Architecture: Bronze/Silver/Gold layers separate concerns for raw ingest, clean transforms, and curated marts.
+- Why Great Expectations: Contract-based data quality supports production-grade SLAs instead of ad-hoc tests.
+- Why Kafka for streaming: Demonstrates event-driven patterns locally without cloud costs or managed services.
+
 ## Real-Time Streaming Extension
 
 Built on top of the batch pipeline, a Kafka-based streaming layer adds real-time event ingestion:
